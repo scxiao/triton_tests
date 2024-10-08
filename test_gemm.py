@@ -160,10 +160,6 @@ def _triton_gemm_kernel(
         # We accumulate along the K dimension.
         accumulator += tl.dot(a, b)
 
-
-    # -----------------------------------------------------------
-    # `alpha_row_ptrs` is a block of [BLOCK_M] pointers
-    # `alpha_col_ptrs` is a block of [BLOCK_N] pointers
     offs_cm = pid_m * BLOCK_M + tl.arange(0, BLOCK_M)
     offs_cn = pid_n * BLOCK_N + tl.arange(0, BLOCK_N)
     c = accumulator.to(C.dtype.element_ty)
@@ -334,8 +330,6 @@ def benchmark(M, N, K, provider):
     tensor_num = num_tensors(M, N, K)
     a = []
     b = []
-    alpha_row = []
-    alpha_col = []
     out = []
 
     for i in range(tensor_num):
@@ -352,19 +346,19 @@ def benchmark(M, N, K, provider):
     if 'torch' in provider:
         torch_gemm = TorchGemm()
         # ms, min_ms, max_ms = triton.testing.do_bench_rotating_tensor(
-        #     lambda i: torch_gemm(a[i % tensor_num], b[i % tensor_num], alpha_row[i % tensor_num], alpha_col[i % tensor_num]), rep=100, quantiles=quantiles
+        #     lambda i: torch_gemm(a[i % tensor_num], b[i % tensor_num]), rep=100, quantiles=quantiles
         # )
         ms, min_ms, max_ms = triton.testing.do_bench(
-            lambda: torch_gemm(a[0], b[0], alpha_row[0], alpha_col[0]), rep=100, quantiles=quantiles
+            lambda: torch_gemm(a[0], b[0]), rep=100, quantiles=quantiles
         )
     else: 
         assert 'triton' in provider
         # out = torch.empty([a.shape[0], b.shape[1]], dtype=torch.half, device=a.device)
         # ms, min_ms, max_ms = triton.testing.do_bench_rotating_tensor(
-        #     lambda i: gemm_forward(out[i % tensor_num], a[i % tensor_num], b[i % tensor_num], alpha_row[i % tensor_num], alpha_col[i % tensor_num]), rep=100, quantiles=quantiles
+        #     lambda i: gemm_forward(out[i % tensor_num], a[i % tensor_num], b[i % tensor_num]), rep=100, quantiles=quantiles
         # )
         ms, min_ms, max_ms = triton.testing.do_bench(
-            lambda: gemm_forward(out[0], a[0], b[0], alpha_row[0], alpha_col[0]), rep=100, quantiles=quantiles
+            lambda: gemm_forward(out[0], a[0], b[0]), rep=100, quantiles=quantiles
         )
         print(f"M = {M}, N = {N}, K = {K}, type = {in_dtype}, best_config = {_triton_gemm_kernel.best_config}")
         # print(f'GEMM SIZE: {M},{N},{K} Best tuning config: ({_triton_gemm_kernel.get_best_config()})')
