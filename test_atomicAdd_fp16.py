@@ -21,14 +21,14 @@ def test_atomic(x: torch.Tensor, val: torch.Tensor, num_tiles:int, BLOCK_SIZE):
 
 
 def test_correctness(num_tiles):
-    tile_size = 256
+    tile_size = 512
     x = torch.zeros((tile_size,), dtype=torch.half, device='cuda')
     val = torch.ones((tile_size,), dtype=torch.half, device='cuda') 
 
-    BLOCK_SIZE=256
+    BLOCK_SIZE=512
     test_atomic(x, val, num_tiles, BLOCK_SIZE)
 
-    print(f"x = {x}")
+    # print(f"x = {x}")
 
     ref = torch.zeros((tile_size, ), dtype = torch.float, device='cuda') + num_tiles
     assert torch.allclose(x.to(torch.float), ref)
@@ -50,9 +50,9 @@ test_correctness(3)
         args={},  # Values for function arguments not in `x_names` and `y_name`.
     ))
 def benchmark(size, provider):
-    tile_size = 256
+    tile_size = 512
     BLOCK_SIZE = tile_size
-    x = torch.zeros((tile_size), device='cuda', dtype=torch.half)
+    x = torch.zeros((tile_size), device='cuda', dtype=torch.bfloat16)
     val = x + 1
     quantiles = [0.5, 0.2, 0.8]
     # if provider == 'torch':
