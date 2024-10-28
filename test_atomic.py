@@ -6,21 +6,36 @@ import triton.language as tl
 
 
 @triton.jit
-def atomic_kernel(x_ptr):
-    tl.atomic_add(x_ptr, 1)
+def atomic_kernel(x_ptr, 
+                out,
+                BLOCK_SIZE: tl.constexpr):
+    pid = tl.program_id(0)
+    offsets = BLOCK_SIZE * pid + tl.arange(0, BLOCK_SIZE)
+    out_ptrs = out + offsets
+    # val = tl.atomic_add(x_ptr, 1, sem='relaxed')
+    val = tl.atomic_add(x_ptr, 1)
+    tl.store(out_ptrs, val)
 
-def test_atomic(x: torch.Tensor, num_tiles:int):
+
+def test_atomic(x: torch.Tensor, out: torch.Tensor, num_tiles:int, BLOCK_SIZE: tl.constexpr):
     grid = lambda meta: (num_tiles, )
-    atomic_kernel[grid](x)
-    return x
+    atomic_kernel[grid](x, out, BLOCK_SIZE)
+    return out
 
-def test_correctness(size):
+def test_correctness(num_tiles):
     x = torch.zeros(1, device='cuda')
-    y = test_atomic(x, size)
-    assert y[0] == size
+    BLOCK_SIZE=1024
+    out = torch.randn((num_tiles * BLOCK_SIZE), dtype=torch.float, device='cuda')
+    test_atomic(x, out, num_tiles, BLOCK_SIZE)
+    sorted_vals, _ = torch.sort(out)
+    out_ref = torch.zeros((num_tiles * BLOCK_SIZE), dtype=torch.float, device='cuda')
+    for i in range(num_tiles):
+        out_ref[i * BLOCK_SIZE:(i + 1) * BLOCK_SIZE] = i
+    assert torch.allclose(sorted_vals, out_ref)
 
-test_correctness(1)
-test_correctness(10)
+
+# test_correctness(1)
+# test_correctness(10)
 test_correctness(100)
 
 @triton.testing.perf_report(
@@ -36,12 +51,12 @@ test_correctness(100)
         args={},  # Values for function arguments not in `x_names` and `y_name`.
     ))
 def benchmark(size, provider):
-    x = torch.zeros(1, device='cuda', dtype=torch.int32)
+    x = torch.zeros(2, device='cuda', dtype=torch.int32)
     quantiles = [0.5, 0.2, 0.8]
-    # if provider == 'torch':
-    #     ms, min_ms, max_ms = triton.testing.do_bench(lambda: x + y, quantiles=quantiles)
+    BLOCK_SIZE = 1024
+    out = torch.randn((size * BLOCK_SIZE), dtype=torch.float, device='cuda')
     if provider == 'triton':
-        ms, min_ms, max_ms = triton.testing.do_bench(lambda: test_atomic(x, size), quantiles=quantiles)
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: test_atomic(x, out, size, BLOCK_SIZE), quantiles=quantiles)
     gbps = lambda ms: round(ms * 1000.0, 3)
     return gbps(ms), gbps(max_ms), gbps(min_ms)
 
