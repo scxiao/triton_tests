@@ -52,7 +52,7 @@ test_correctness(3)
 def benchmark(size, provider):
     tile_size = 512
     BLOCK_SIZE = tile_size
-    x = torch.zeros((tile_size), device='cuda', dtype=torch.bfloat16)
+    x = torch.zeros((tile_size), device='cuda', dtype=torch.float16)
     val = x + 1
     quantiles = [0.5, 0.2, 0.8]
     # if provider == 'torch':
