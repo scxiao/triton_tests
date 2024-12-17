@@ -156,7 +156,7 @@ def kernel_add2d_trans_input1(x_ptr, y_ptr, out_ptr,
 
 def add2d_trans_input_op1(x, y, output):
     M, N = output.shape
-    BLOCK_M = 32
+    BLOCK_M = 64
     BLOCK_N = 64
     grid = lambda meta: (triton.cdiv(M, meta['BLOCK_M']), triton.cdiv(N, meta['BLOCK_N']))
     kernel_add2d_trans_input1[grid](x, y, output, 
@@ -168,7 +168,7 @@ def add2d_trans_input_op1(x, y, output):
 
 def test_add2d_trans_input1():
     torch.manual_seed(0)
-    M, N = 222, 213
+    M, N = 512, 65536
     x = torch.rand((M, N), device=DEVICE)
     y = torch.rand((N, M), device=DEVICE).T
     output_triton = torch.empty_like(x)
@@ -206,7 +206,7 @@ def kernel_add2d_trans_op(x_ptr, y_ptr, out_ptr,
 
 def add2d_trans_op(x, y, output):
     M, N = output.shape
-    BLOCK_M = 32
+    BLOCK_M = 64
     BLOCK_N = 64
     grid = lambda meta: (triton.cdiv(M, meta['BLOCK_M']), triton.cdiv(N, meta['BLOCK_N']))
     kernel_add2d_trans_op[grid](x, y, output, 
