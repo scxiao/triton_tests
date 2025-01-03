@@ -1,0 +1,14 @@
+ARG INPUT_DOCKER="rocm/pytorch:rocm6.3_ubuntu24.04_py3.12_pytorch_release_2.4.0"
+
+FROM ${INPUT_DOCKER}
+
+# Setup user account
+ARG uid=${UID}
+ARG gid=${GID}
+ARG USER_NAME=${USERNAME}
+RUN groupadd -r -f -g ${gid} ${USER_NAME} && useradd -o -r -l -u ${uid} -g ${gid} -ms /bin/bash ${USER_NAME}
+RUN usermod -aG sudo ${USER_NAME}
+RUN echo ${USER_NAME}:'temp' | chpasswd
+RUN mkdir -p /workspace && chown ${USER_NAME} /workspace
+USER ${USER_NAME}
+RUN ["/bin/bash"]

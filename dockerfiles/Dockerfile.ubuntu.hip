@@ -1,0 +1,63 @@
+FROM ubuntu:22.04
+
+ARG PREFIX=/usr/local
+
+# Support multiarch
+RUN dpkg --add-architecture i386
+
+# Install rocm key
+RUN apt-get update && apt-get install -y software-properties-common gnupg2 --no-install-recommends curl && \
+    curl -sL http://repo.radeon.com/rocm/rocm.gpg.key | apt-key add -
+
+#RUN sh -c 'echo deb [arch=amd64 trusted=yes] http://repo.radeon.com/rocm/apt/6.0.2/ jammy main > /etc/apt/sources.list.d/rocm.list'
+
+# From docs.amd.com for installing rocm. Needed to install properly
+#RUN sh -c "echo 'Package: *\nPin: release o=repo.radeon.com\nPin-priority: 600' > /etc/apt/preferences.d/rocm-pin-600"
+
+# rocgdb doesn't work on 22.04, workaround by installing the older python packages that are in 20.04
+#RUN add-apt-repository -y ppa:deadsnakes/ppa
+
+
+# Add rocm repository
+RUN sh -c 'echo deb [arch=amd64 trusted=yes] http://repo.radeon.com/rocm/apt/6.0.2/ jammy main > /etc/apt/sources.list.d/rocm.list'
+# From docs.amd.com for installing rocm. Needed to install properly
+RUN sh -c "echo 'Package: *\nPin: release o=repo.radeon.com\nPin-priority: 600' > /etc/apt/preferences.d/rocm-pin-600"
+
+#RUN sh -c 'echo deb [arch=amd64 trusted=yes] https://repo.radeon.com/rocm/apt/6.1.1 jammy main > /etc/apt/sources.list.d/rocm.list'
+#RUN sh -c "echo 'Package: *\nPin: release o=repo.radeon.com\nPin-Priority: 600' > /etc/apt/preferences.d/rocm-pin-600"
+
+
+# rocgdb doesn't work on 22.04, workaround by installing the older python packages that are in 20.04
+RUN add-apt-repository -y ppa:deadsnakes/ppa
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
+    apt-utils \
+    bison \
+    build-essential \
+    cmake \
+    curl \
+    flex \
+    g++ \
+    gdb \
+    git \
+    lcov \
+    locales \
+    pkg-config \
+    python3 \
+    python3-dev \
+    python3-pip \
+    libpython3.8 \
+    wget \
+    rocm-hip-runtime \
+    vim
+
+RUN echo 'alias python="/usr/bin/python3"' >> /root/.bashrc
+
+# upgrade pip
+RUN pip install --upgrade pip
+
+# install pytorch
+RUN pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.0/
+RUN pip3 install ninja matplotlib pandas seaborn tqdm pytest
+#RUN pip3 uninstall pytorch_triton_rocm
+
