@@ -7,8 +7,8 @@ ARG uid=${UID}
 ARG gid=${GID}
 ARG USER_NAME=${USERNAME}
 RUN groupadd -r -f -g ${gid} ${USER_NAME} && useradd -o -r -l -u ${uid} -g ${gid} -ms /bin/bash ${USER_NAME}
-RUN usermod -aG sudo ${USER_NAME}
-RUN echo ${USER_NAME}:'temp' | chpasswd
+RUN usermod -aG sudo ${USER_NAME} && usermod -aG irc ${USER_NAME} && usermod -aG video ${USER_NAME}
+RUN echo ${USER_NAME}:'rocm' | chpasswd
 RUN mkdir -p /workspace && chown ${USER_NAME} /workspace
 USER ${USER_NAME}
 RUN ["/bin/bash"]
