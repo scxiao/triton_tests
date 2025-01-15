@@ -7,6 +7,7 @@ import triton.language as tl  # @manual=//triton:tritonl
 @triton.jit
 def atomic_kernel(x_ptr, y_ptr, BLOCK_SIZE: tl.constexpr):
     pid = tl.program_id(0)
+    tl.assume(pid > 0)
     offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     x = tl.load(x_ptr + offsets)
     tl.atomic_add(y_ptr + tl.arange(0, BLOCK_SIZE), x)
@@ -31,7 +32,7 @@ def test(n, BLOCK_SIZE=32, dtype=torch.bfloat16):
 @triton.testing.perf_report(
     triton.testing.Benchmark(
         x_names=["size"],
-        x_vals=[1024 * i for i in range(1, 28, 1)],
+        x_vals=[2048 * i for i in range(1, 28, 1)],
         line_arg="dtype",
         # line_vals=[torch.bfloat16, torch.float16],
         # line_names=["bf16", "fp16"],
@@ -44,7 +45,7 @@ def test(n, BLOCK_SIZE=32, dtype=torch.bfloat16):
     )
 )
 def benchmark(size, dtype):
-    BLOCK_SIZE = 32
+    BLOCK_SIZE = 2048
     quantiles = [0.5, 0.2, 0.8]
     x = torch.rand(size, dtype=dtype, device="cuda")
     y = torch.rand(BLOCK_SIZE, dtype=dtype, device="cuda")
