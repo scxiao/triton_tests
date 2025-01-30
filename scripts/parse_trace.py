@@ -7,6 +7,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Script to analyze torch trace file")
     parser.add_argument('--trace_file', type=str, required=True, help="trace file to be analyzed")
     parser.add_argument('--kernel_name', type=str, required=True, help="kernel name")
+    parser.add_argument('--pic', action='store_true', default=False, help="Whether generate figure to show perf variance")
     args = parser.parse_args()
 
     return args
@@ -22,7 +23,7 @@ def main():
     kernel_time = []
     for e in trace_events:
         name = e["name"]
-        if name == kernel_name:
+        if kernel_name in name:
             kt = e["dur"]
             kernel_time.append(kt)
 
@@ -36,12 +37,16 @@ def main():
     print(f"    Max:  {max_time} us")
     print(f"    Min:  {min_time} us")
     print(f"    Num of calls: {len(kernel_time)}")
-    plt.plot(kernel_time)
-    plt.xlabel(f'{kernel_name} call in order')
-    plt.ylabel(f'time (us)')
-    plt.show()
-    plt_name = f"plot_{file_name}_{kernel_name}.png"
-    plt.savefig(plt_name)
+
+    if args.pic:
+        plt.plot(kernel_time)
+        plt.xlabel(f'{kernel_name} call in order')
+        plt.ylabel(f'time (us)')
+        plt.show()
+        plt_name = f"plot_{file_name}_{kernel_name}.png"
+        # replace '/' with '_'
+        plt_name = plt_name.replace('/', '_')
+        plt.savefig(plt_name)
 
 if __name__ == "__main__":
     main()
