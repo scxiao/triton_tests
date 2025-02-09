@@ -6,9 +6,11 @@ FROM ${INPUT_DOCKER}
 ARG uid=${UID}
 ARG gid=${GID}
 ARG USER_NAME=${USERNAME}
+ARG DEVICE_ID=${device_id}
 RUN groupadd -r -f -g ${gid} ${USER_NAME} && useradd -o -r -l -u ${uid} -g ${gid} -ms /bin/bash ${USER_NAME}
 RUN usermod -aG sudo ${USER_NAME} && usermod -aG irc ${USER_NAME} && usermod -aG video ${USER_NAME}
 RUN echo ${USER_NAME}:'rocm' | chpasswd
 RUN mkdir -p /workspace && chown ${USER_NAME} /workspace
 USER ${USER_NAME}
+ENV HIP_VISIBLE_DEVICES=${DEVICE_ID}
 RUN ["/bin/bash"]

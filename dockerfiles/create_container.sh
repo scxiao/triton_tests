@@ -7,6 +7,7 @@ fi
 
 UID=`id -u`
 GID=`id -g`
+gpu_id=7
 USER_NAME=${USER}
 IMG_NAME=$1
 MY_IMG_NAME=${IMG_NAME}_${USER_NAME}
@@ -21,7 +22,7 @@ echo "my docker name: $MY_DOCKER_NAME"
 # customerize the docker image for specific folder mount
 # use my own username instead of root
 docker build --build-arg uid=$UID --build-arg gid=$GID --build-arg USER_NAME=$USER_NAME --build-arg \
-INPUT_DOCKER=$IMG_NAME -t $MY_IMG_NAME -f Dockerfile.wrapper .
+INPUT_DOCKER=$IMG_NAME --build-arg DEVICE_ID=$gpu_id -t $MY_IMG_NAME -f Dockerfile.wrapper .
 
 # create a docker container using the customerized docker image
 docker run -it --network=host --group-add=video --ipc=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
