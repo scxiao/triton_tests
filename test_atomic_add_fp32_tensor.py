@@ -4,6 +4,12 @@ import triton  # @manual=//triton:tritonn
 import triton.language as tl  # @manual=//triton:tritonl
 
 
+def torch_atomic_add(x_ptr, idx_ptr, v_ptr, column_size, block_m, block_n):
+    for i in range(block_m):
+        for j in range(block_n):
+            # if j % 2 == 0:
+            x_ptr[i][idx_ptr[i][j]] += v_ptr[i][j]
+
 @triton.jit
 def atomic_kernel(x_ptr, 
                   idx_ptr, 
@@ -20,7 +26,10 @@ def atomic_kernel(x_ptr,
     idx = tl.load(idx_ptrs)
     val = tl.load(v_ptrs)
 
-    tl.atomic_add(x_ptrs + idx, val, sem="relaxed")
+    mask_n = offs_n < column_size
+
+    # tl.atomic_add(x_ptrs + idx, val, mask = mask_n[None, :], sem="relaxed")
+    tl.atomic_add(x_ptrs + idx, val, mask = mask_n[None, :], sem="relaxed")
 
 
 def run_once(x, idx, val, block_m, block_n):
@@ -30,10 +39,16 @@ def run_once(x, idx, val, block_m, block_n):
 
 def test(row_num, column_num, block_m=32, block_n=32, dtype=torch.float32):
     x = torch.zeros((row_num, column_num), dtype=dtype, device="cuda")
+    x_ref = torch.zeros((row_num, column_num), dtype=dtype, device="cuda")
     idx = torch.randint(0, column_num, (block_m, block_n), dtype=torch.int32, device='cuda')
     val = torch.rand((block_m, block_n), dtype=dtype, device='cuda')
     run_once(x, idx, val, block_m, block_n)
+    torch_atomic_add(x_ref, idx, val, x_ref.shape[1], row_num, column_num)
 
+    print(f"x = {x}")
+    print(f"x_ref = {x_ref}")
+
+    torch.testing.assert_close(x, x_ref)
 
 @triton.testing.perf_report(
     triton.testing.Benchmark(
@@ -64,8 +79,8 @@ def benchmark(row_num, dtype):
 
 
 def main():
-    benchmark.run(print_data=True, show_plots=True, save_path=".")
-    # test(1, 20, 32, 32)
+    # benchmark.run(print_data=True, show_plots=True, save_path=".")
+    test(1, 20, 32, 32)
 
 if __name__ == "__main__":
     main()
