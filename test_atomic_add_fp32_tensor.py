@@ -8,8 +8,9 @@ def torch_atomic_add(x_ptr, idx_ptr, v_ptr, row_size, column_size, block_m, bloc
     for r in range(row_size):
         for i in range(block_m):
             for j in range(block_n):
-                if j % 2 == 0:
-                    x_ptr[r][idx_ptr[i][j]] += v_ptr[i][j]
+                # if j % 2 == 0:
+                x_ptr[r][idx_ptr[i][j]] += v_ptr[i][j]
+
 
 @triton.jit
 def atomic_kernel(x_ptr, 
@@ -38,20 +39,33 @@ def run_once(x, idx, val, block_m, block_n):
     tile_num = x.shape[0]
     atomic_kernel[(tile_num,)](x, idx, val, x.shape[0], x.shape[1], block_m, block_n)
 
-    # test(1, 64, 32, 32)
 
-def test(row_num, column_num, block_m=32, block_n=32, dtype=torch.float32):
+def check_correctness(row_num, column_num, block_m=32, block_n=32, dtype=torch.float32, trans = False):
     x = torch.zeros((row_num, column_num), dtype=dtype, device="cuda")
     x_ref = torch.zeros((row_num, column_num), dtype=dtype, device="cuda")
-    idx = torch.randint(0, column_num, (block_m, block_n), dtype=torch.int32, device='cuda')
+
+    i_val = list(range(column_num))
+    idx = torch.tensor(i_val, dtype=torch.int32, device='cuda')
+    idx = idx.broadcast_to(block_m // 2, column_num).contiguous()
+    idx = idx.reshape((-1, block_n))
+    if trans:
+        idx = idx.transpose(1, 0).contiguous()
+
+    # idx = torch.randint(0, column_num, (block_m, block_n), dtype=torch.int32, device='cuda')
     val = torch.rand((block_m, block_n), dtype=dtype, device='cuda')
     run_once(x, idx, val, block_m, block_n)
     torch_atomic_add(x_ref, idx, val, x_ref.shape[0], x_ref.shape[1], block_m, block_n)
 
-    print(f"x = {x}")
-    print(f"x_ref = {x_ref}")
+    # print(f"x = {x}")
+    # print(f"x_ref = {x_ref}")
 
     torch.testing.assert_close(x, x_ref)
+
+def test_trans():
+    check_correctness(10, 64, trans=True)
+
+def test_no_trans():
+    check_correctness(10, 64, trans=True)
 
 @triton.testing.perf_report(
     triton.testing.Benchmark(
@@ -68,11 +82,18 @@ def test(row_num, column_num, block_m=32, block_n=32, dtype=torch.float32):
 )
 def benchmark(row_num, dtype):
     quantiles = [0.5, 0.2, 0.8]
-    column_num = 5
+    column_num = 64
     block_m = 32
     block_n = 32
     x = torch.zeros((row_num, column_num), dtype=dtype, device="cuda")
-    idx = torch.randint(0, column_num, (block_m, block_n), dtype=torch.int32, device='cuda')
+    i_val = list(range(column_num))
+    idx = torch.tensor(i_val, dtype=torch.int32, device='cuda')
+    idx = idx.broadcast_to(block_m // 2, column_num).contiguous()
+    idx = idx.reshape((-1, block_n))
+    idx = idx.transpose(1, 0).contiguous()
+    # print(f"idx_shape = {idx.shape}")
+
+    # idx = torch.randint(0, column_num, (block_m, block_n), dtype=torch.int32, device='cuda')
     val = torch.rand((block_m, block_n), dtype=dtype, device='cuda')
     ms, min_ms, max_ms = triton.testing.do_bench(
         lambda: run_once(x, idx, val, block_m, block_n), quantiles=quantiles
@@ -82,8 +103,7 @@ def benchmark(row_num, dtype):
 
 
 def main():
-    # benchmark.run(print_data=True, show_plots=True, save_path=".")
-    test(1, 64, 32, 32)
+    benchmark.run(print_data=True, show_plots=True, save_path=".")
 
 if __name__ == "__main__":
     main()
