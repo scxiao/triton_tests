@@ -7,7 +7,7 @@ fi
 
 UID=`id -u`
 GID=`id -g`
-gpu_id=7
+gpu_id=5
 USER_NAME=${USER}
 IMG_NAME=$1
 MY_IMG_NAME=${IMG_NAME}_${USER_NAME}

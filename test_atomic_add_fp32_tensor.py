@@ -30,7 +30,7 @@ def atomic_kernel(x_ptr,
     # mask_n = offs_n % 2 == 0
 
     # tl.atomic_add(x_ptrs + idx, val, mask = mask_n[None, :], sem="relaxed")
-    tl.atomic_add(x_ptrs + idx, val, sem="relaxed")
+    tl.atomic_add(x_ptrs + idx, val, sem='relaxed')
 
 
 def run_once(x, idx, val, block_m, block_n):

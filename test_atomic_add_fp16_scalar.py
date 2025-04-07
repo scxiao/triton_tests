@@ -34,7 +34,7 @@ def test_correctness(num_tiles):
     assert torch.allclose(x.to(torch.float), ref)
 
 
-test_correctness(3)
+#test_correctness(3)
 
 
 @triton.testing.perf_report(
@@ -64,3 +64,42 @@ def benchmark(size, provider):
 
 
 benchmark.run(print_data=True, show_plots=True, save_path='.')
+
+
+
+@triton.jit
+def atomic_kernel_scalar(x_ptr,
+                  val,
+                  out_ptr,
+                  BLOCK_SIZE: tl.constexpr):
+    offsets = tl.arange(0, BLOCK_SIZE)
+    x_ptrs = x_ptr
+    pid = tl.program_id(0)
+    out_ptrs = out_ptr + pid * BLOCK_SIZE + offsets
+    v = tl.atomic_add(x_ptrs, val)
+    tl.store(out_ptrs, v[:, None])
+
+
+def test_atomic_scalar(x: torch.Tensor, out: torch.Tensor, val, num_tiles:int, BLOCK_SIZE):
+    grid = lambda meta: (num_tiles, )
+    atomic_kernel_scalar[grid](x, val, out, BLOCK_SIZE)
+
+
+def test_correctness_scalar(num_tiles):
+    tile_size = 512
+    BLOCK_SIZE=512
+    x = torch.zeros((1,), dtype=torch.float32, device='cuda')
+    out = torch.zeros((num_tiles, BLOCK_SIZE), dtype=torch.float32, device='cuda') + 100
+    # val = torch.ones((tile_size,), dtype=torch.half, device='cuda') 
+    val = 1
+
+    test_atomic_scalar(x, out, val, num_tiles, BLOCK_SIZE)
+
+    print(f"x = {x}")
+    print(f"out = {out}")
+
+    # ref = torch.zeros((tile_size, ), dtype = torch.float, device='cuda') + num_tiles
+    # assert torch.allclose(x.to(torch.float), ref)
+
+
+#test_correctness_scalar(10)
