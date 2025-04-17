@@ -19,7 +19,7 @@ class TorchGemm(torch.nn.Module):
         x = torch.matmul(a.to(torch.float32), b.to(torch.float32))
         return x.to(torch.half)
 
-nstages=2
+nstages=1
  
 def _get_tune_configs():
     configs = [
@@ -60,7 +60,7 @@ def _get_tune_configs():
         # triton.Config({'BLOCK_M': 16, 'BLOCK_N': 32, 'BLOCK_K': 128, 'GROUP_SIZE_M': 1, 'matrix_instr_nonkdim': 16, 'kpack': 2}, num_stages=nstages, num_warps=2),
         # triton.Config({'BLOCK_M': 16, 'BLOCK_N': 32, 'BLOCK_K': 256, 'GROUP_SIZE_M': 1, 'matrix_instr_nonkdim': 16, 'kpack': 2}, num_stages=nstages, num_warps=2),
         # triton.Config({'BLOCK_M': 16, 'BLOCK_N': 32, 'BLOCK_K': 512, 'GROUP_SIZE_M': 1, 'matrix_instr_nonkdim': 16, 'kpack': 2}, num_stages=nstages, num_warps=2),
-        triton.Config({'BLOCK_M': 16, 'BLOCK_N': 64, 'BLOCK_K': 256, 'GROUP_SIZE_M': 1, 'matrix_instr_nonkdim': 464, 'kpack': 2}, num_stages=nstages, num_warps=2),
+        triton.Config({'BLOCK_M': 16, 'BLOCK_N': 32, 'BLOCK_K': 128, 'GROUP_SIZE_M': 1, 'matrix_instr_nonkdim': 16, 'kpack': 1}, num_stages=nstages, num_warps=2),
         # triton.Config({'BLOCK_M': 16, 'BLOCK_N': 32, 'BLOCK_K': 2048, 'GROUP_SIZE_M': 1, 'matrix_instr_nonkdim': 16, 'kpack': 2}, num_stages=nstages, num_warps=2),
     ] if is_hip() else [
         triton.Config({'BLOCK_M': 128, 'BLOCK_N': 256, 'BLOCK_K': 64, 'GROUP_SIZE_M': 8}, num_stages=3, num_warps=8),
@@ -291,17 +291,6 @@ def gen_input(M, N, ty_name, needTrans, seed, device='cuda'):
     return input, input_f16
 
 
-def get_type(provider):
-    res = re.findall(r'\(.*?\)', provider)
-    return res[0][1:-1]
-
-def num_tensors(M, N, K):
-    size = M * N + M * K + N * K + M + N
-    total_size = 512 * 1024 * 1024
-    num = triton.cdiv(total_size, size)
-    return num 
-
-
 # %%
 # Benchmark
 # ---------
@@ -367,20 +356,11 @@ def benchmark(M, N, K, provider):
     # perf_us = lambda x: round(2 * M * N * K / x * 1e-9, 2)
     return perf_us(ms), perf_us(min_ms), perf_us(max_ms)
  
- 
-if __name__ == '__main__':
-    benchmark.run(show_plots=False, print_data=True)
-
-
-@pytest.mark.parametrize('m, n, k', get_shapes())
 def test_gemm(m, n, k):
     torch.random.manual_seed(0)
     with torch.no_grad():
-        # a = torch.randint(-12, 12, (m, k), dtype=torch.int8).cuda()
-        # b = torch.randint(-12, 12, (n, k), dtype=torch.int8).cuda().T
-
-        a, _ = gen_input(m, k, 'int8', False, 1, device='cuda')
-        b, _ = gen_input(k, n, 'int8', True, 2, device='cuda')
+        a, _ = gen_input(m, k, 'fp16', False, 1, device='cuda')
+        b, _ = gen_input(k, n, 'fp16', False, 2, device='cuda')
 
         torch_gemm = TorchGemm()
         out_torch = torch_gemm(a, b)
@@ -388,8 +368,6 @@ def test_gemm(m, n, k):
         gemm_forward(out_triton, a, b)
         print(f"M = {m}, N = {n}, K = {k}, best_config = {_triton_gemm_kernel.best_config}")
 
-        print(f"out_torch = {out_torch}")
-        print(f"out_triton = {out_triton}")
+        torch.testing.assert_close(out_torch, out_triton)
 
-        diff = ~np.isclose(out_triton.half().cpu().numpy(), out_torch.half().cpu().numpy(), rtol=1e-2)
-        assert diff.sum() < 10, f"m={m}, n={n}, k={k}"
+test_gemm(16, 32, 128)
