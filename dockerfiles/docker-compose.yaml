@@ -1,0 +1,31 @@
+services:
+  phantom:
+    container_name: scxiao_test_triton
+    image: ${DISAGG_IMAGE:-rocm/pytorch:rocm7.0_ubuntu24.04_py3.12_pytorch_release_2.7.1}
+    privileged: true
+    network_mode: host
+    group_add:
+      - video
+    ipc: host
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    volumes:
+      - /data:/data
+      - ${HOME}/Workplace:/workspace
+    environment:
+      - WORKSPACE_DIR=/workspace
+    shm_size: 32G
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    stdin_open: true
+    tty: true
+
+
+# command:
+# docker compose up -d
